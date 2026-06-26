@@ -1,0 +1,16 @@
+{
+  "name": "deal-finder-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:bot": "npm run dev --workspace=apps/bot",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build:bot": "npm run build --workspace=apps/bot",
+    "build:web": "npm run build --workspace=apps/web",
+    "start:bot": "npm run start --workspace=apps/bot",
+    "start:web": "npm run start --workspace=apps/web"
+  }
+}

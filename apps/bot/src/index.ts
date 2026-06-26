@@ -1,0 +1,90 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import { DealItem, Scraper } from './types';
+import { MockScraper } from './scrapers/mock';
+import { EbayScraper } from './scrapers/ebay';
+import { SlickdealsScraper } from './scrapers/slickdeals';
+import { AmazonInScraper } from './scrapers/amazon_in';
+import { FlipkartScraper } from './scrapers/flipkart';
+import { DealEvaluator } from './evaluator';
+import { DealNotifier } from './notifier';
+
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const KEYWORDS = ['playstation 5', 'ps5 slim', 'iphone 15 pro', 'oneplus 12', 'rtx 4060', 'steam deck', 'nintendo switch'];
+
+class DealFinderApp {
+  private scrapers: Scraper[] = [];
+  private evaluator = new DealEvaluator();
+  private notifier = new DealNotifier();
+  private notifiedDeals = new Set<string>();
+  private intervalMs = parseInt(process.env.SCRAPE_INTERVAL_MS || '300000', 10);
+  private isRunning = false;
+
+  constructor() {
+    const mockMode = process.env.MOCK_MODE !== 'false';
+    
+    if (mockMode) {
+      console.log('[App] Booting in MOCK MODE (using mock listings feed).');
+      this.scrapers.push(new MockScraper());
+    } else {
+      console.log('[App] Booting in LIVE MODE (Scraping live Indian & Global marketplaces).');
+      this.scrapers.push(new AmazonInScraper());
+      this.scrapers.push(new FlipkartScraper());
+      this.scrapers.push(new EbayScraper());
+      this.scrapers.push(new SlickdealsScraper());
+    }
+  }
+
+  async runOnce(): Promise<void> {
+    console.log(`\n[${new Date().toLocaleTimeString()}] Starting scrape cycle...`);
+    
+    for (const scraper of this.scrapers) {
+      try {
+        console.log(`[App] Running scraper: ${scraper.name}`);
+        const items = await scraper.scrape(KEYWORDS);
+        console.log(`[App] Found ${items.length} raw items from ${scraper.name}`);
+
+        for (const item of items) {
+          if (this.notifiedDeals.has(item.id)) continue;
+
+          console.log(`[App] Evaluating item: "${item.title}" (${item.currency === 'INR' ? '₹' : '$'}${item.price})`);
+          const evaluation = await this.evaluator.evaluate(item);
+
+          if (evaluation.isDeal) {
+            console.log(`[App] Profit opportunity found! Profit: +${item.currency === 'INR' ? '₹' : '$'}${evaluation.estimatedProfit.toFixed(2)}`);
+            await this.notifier.notify(item, evaluation);
+            this.notifiedDeals.add(item.id);
+          } else {
+            console.log(`[App] Filtered out: ${evaluation.reasoning}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`[App] Error executing scraper ${scraper.name}:`, error.message);
+      }
+    }
+    console.log(`[App] Scrape cycle complete. Processed deals count: ${this.notifiedDeals.size}`);
+  }
+
+  async start(): Promise<void> {
+    if (this.isRunning) return;
+    this.isRunning = true;
+
+    console.log('='.repeat(50));
+    console.log('🚀 India Market Deal Finder & Arbitrage Engine Started');
+    console.log(`Scan Interval: ${this.intervalMs / 1000}s`);
+    console.log(`Keywords: ${KEYWORDS.join(', ')}`);
+    console.log('='.repeat(50));
+
+    await this.runOnce();
+
+    setInterval(async () => {
+      await this.runOnce();
+    }, this.intervalMs);
+  }
+}
+
+// Start the application
+const app = new DealFinderApp();
+app.start();
