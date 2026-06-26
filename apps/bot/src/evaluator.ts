@@ -48,7 +48,7 @@ export class DealEvaluator {
 
   private async parseAndEvaluateTelegramWithAI(item: DealItem): Promise<EvaluationResult> {
     try {
-      const model = this.ai!.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
       
       const prompt = `You are an expert shopping deal aggregator and consumer copywriter.
 Analyze this social media post sharing a shopping offer and extract the underlying deal details.
@@ -82,7 +82,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
       const estimatedProfit = item.marketPriceEstimate - totalCost;
 
       return {
-        isDeal: result.isDeal && result.safetyScore >= 70 && estimatedProfit > 1000,
+        isDeal: result.isDeal && result.safetyScore >= 70 && estimatedProfit > 100,
         reasoning: result.reasoning,
         estimatedResaleValue: item.marketPriceEstimate,
         estimatedProfit,
@@ -136,7 +136,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
 
   private async evaluateWithAI(item: DealItem, totalCost: number): Promise<EvaluationResult> {
     try {
-      const model = this.ai!.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const currencySymbol = item.currency === 'INR' ? '₹' : '$';
       const currencyLabel = item.currency === 'INR' ? 'INR (Indian Rupees)' : 'USD (US Dollars)';
       
