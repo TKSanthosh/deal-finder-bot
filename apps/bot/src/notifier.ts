@@ -129,6 +129,14 @@ export class DealNotifier {
     }
   }
 
+  /** Escape special HTML characters for Telegram HTML parse mode */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   private async notifyTelegram(
     item: DealItem,
     evaluation: EvaluationResult,
@@ -143,30 +151,37 @@ export class DealNotifier {
       const savingsPercent = item.marketPriceEstimate > 0 ? ((savings / item.marketPriceEstimate) * 100).toFixed(0) : '0';
       const storeName = item.source === 'amazon_in' ? 'Amazon India' : 'Flipkart';
 
-      const text = `🔥 <b>DEAL ALERT: ${item.title}</b>
+      // Escape HTML entities in user-generated content to prevent Telegram 400 errors
+      const safeTitle = this.escapeHtml(item.title || 'Great Deal');
+      const safeReasoning = this.escapeHtml(evaluation.reasoning || '');
+
+      const text = `🔥 <b>DEAL ALERT: ${safeTitle}</b>
 
 ⚡ <b>Super discount on ${storeName}!</b>
 ❌ <b>Original Price:</b> ${symbol}${item.marketPriceEstimate.toLocaleString('en-IN')}
 ✅ <b>Deal Price:</b> ${symbol}${item.price.toLocaleString('en-IN')} (Save ${savingsPercent}%)
 
 📝 <b>About this product:</b>
-<i>${evaluation.reasoning}</i>
+<i>${safeReasoning}</i>
 
 👉 <a href="${affiliateUrl}"><b>BUY NOW ON ${storeName.toUpperCase()}</b></a>`;
+
+      // Telegram captions are limited to 1024 chars for photos
+      const finalText = item.imageUrl ? text.substring(0, 1024) : text;
 
       if (item.imageUrl) {
         const url = `https://api.telegram.org/bot${this.telegramToken}/sendPhoto`;
         await axios.post(url, {
           chat_id: this.telegramChatId,
           photo: item.imageUrl,
-          caption: text,
+          caption: finalText,
           parse_mode: 'HTML'
         });
       } else {
         const url = `https://api.telegram.org/bot${this.telegramToken}/sendMessage`;
         await axios.post(url, {
           chat_id: this.telegramChatId,
-          text: text,
+          text: finalText,
           parse_mode: 'HTML',
           disable_web_page_preview: false
         });
@@ -174,6 +189,9 @@ export class DealNotifier {
       console.log('[Notifier] Telegram notification sent successfully.');
     } catch (error: any) {
       console.error('[Notifier] Error sending Telegram message:', error.message);
+      if (error.response?.data) {
+        console.error('[Notifier] Telegram API response:', JSON.stringify(error.response.data));
+      }
     }
   }
 

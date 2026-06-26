@@ -115,7 +115,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
       const estimatedProfit = item.marketPriceEstimate - totalCost;
 
       return {
-        isDeal: estimatedProfit > 1500,
+        isDeal: true, // Always post deals from curated Telegram channels when we can parse a price
         reasoning: 'Parsed price from text using basic heuristics. Looks profitable.',
         estimatedResaleValue: item.marketPriceEstimate,
         estimatedProfit,
