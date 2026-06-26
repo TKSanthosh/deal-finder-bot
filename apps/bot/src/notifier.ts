@@ -234,22 +234,28 @@ export class DealNotifier {
       console.log(`[Notifier] Posting deal to Twitter/X...`);
 
       const cleanReasoning = evaluation.reasoning.replace(/<[^>]*>/g, ''); // strip HTML tags
+      const tags = `#DealsIndia #LootDeals #AmazonDeals #FlipkartDeals #TechDeals #DiscountIndia #DealsRadar`;
 
+      // Build the tweet dynamically
       let tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
       tweetText += `💰 Deal Price: ₹${item.price.toLocaleString('en-IN')}\n`;
-      tweetText += `📝 ${cleanReasoning.substring(0, 100)}...\n\n`;
-      tweetText += `👉 Buy Now: ${affiliateUrl}\n`;
-      tweetText += `⚡ Join Telegram: t.me/dealradarindia2002`;
+      tweetText += `📝 ${cleanReasoning.substring(0, 80)}...\n\n`;
+      tweetText += `👉 Buy: ${affiliateUrl}\n`;
+      tweetText += `⚡ Telegram: t.me/dealradarindia2002\n\n`;
+      tweetText += tags;
 
+      // Adjust length if it exceeds 280 characters
       if (tweetText.length > 280) {
         const diff = tweetText.length - 280;
-        const availableReasoning = 100 - diff - 5;
+        const availableReasoning = 80 - diff - 5;
         const shortReasoning = availableReasoning > 0 ? cleanReasoning.substring(0, availableReasoning) + '...' : '';
+        
         tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
         tweetText += `💰 Price: ₹${item.price.toLocaleString('en-IN')}\n`;
         if (shortReasoning) tweetText += `📝 ${shortReasoning}\n\n`;
-        tweetText += `👉 Buy Now: ${affiliateUrl}\n`;
-        tweetText += `⚡ Join Telegram: t.me/dealradarindia2002`;
+        tweetText += `👉 Buy: ${affiliateUrl}\n`;
+        tweetText += `⚡ Telegram: t.me/dealradarindia2002\n\n`;
+        tweetText += tags;
       }
 
       await this.twitterClient.v2.tweet(tweetText);
