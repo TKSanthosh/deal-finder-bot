@@ -14,13 +14,20 @@ export class DealEvaluator {
   }
 
   async evaluate(item: DealItem): Promise<EvaluationResult> {
+    // If this is a raw Telegram post, we first need to parse it using Gemini
+    if (item.price === 0 && item.description) {
+      if (this.ai) {
+        return this.parseAndEvaluateTelegramWithAI(item);
+      } else {
+        return this.parseTelegramWithHeuristics(item);
+      }
+    }
+
+    // Standard evaluation for pre-parsed mock/ebay items
     const totalCost = item.price + (item.shippingPrice || 0);
     const potentialMargin = item.marketPriceEstimate - totalCost;
-
-    // Minimum profit threshold (₹1,000 for INR, $15 for USD)
     const minProfitThreshold = item.currency === 'INR' ? 1000 : 15;
 
-    // Phase 1: Basic Arbitrage Heuristic Check
     if (potentialMargin <= minProfitThreshold || totalCost >= item.marketPriceEstimate) {
       return {
         isDeal: false,
@@ -32,12 +39,99 @@ export class DealEvaluator {
       };
     }
 
-    // Phase 2: AI Verification (or Heuristic Fallback)
     if (this.ai) {
       return this.evaluateWithAI(item, totalCost);
     } else {
       return this.evaluateWithHeuristics(item, totalCost);
     }
+  }
+
+  private async parseAndEvaluateTelegramWithAI(item: DealItem): Promise<EvaluationResult> {
+    try {
+      const model = this.ai!.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      
+      const prompt = `You are an expert shopping deal aggregator and product flipper.
+Analyze this social media post sharing a shopping offer and extract the underlying deal details.
+
+Post Content:
+"${item.description}"
+
+You must return a raw JSON object (no markdown formatting, no \`\`\`json) matching this schema:
+{
+  "productTitle": "string (Clean product name without emojis or promotional buzzwords, e.g. 'OnePlus 12 Flowy Emerald')",
+  "price": number (The actual deal purchase price in INR, e.g. 52999. If a range is given, use the lowest applicable price),
+  "marketPriceEstimate": number (The typical normal retail price or MSRP of this item in India. If not specified, estimate a realistic market value),
+  "isDeal": boolean (true if the deal price offers a significant discount of at least 20% compared to typical retail price),
+  "reasoning": "string (1-2 sentences summarizing the offer details, card discounts, and flip margins)",
+  "safetyScore": number // 0-100 (Deduct points if the post indicates the item is used, refurbished, damaged, box-only, or a suspicious clone. New items from Amazon/Flipkart should be 100)
+}
+`;
+
+      const response = await model.generateContent(prompt);
+      const text = response.response.text().trim();
+      
+      const jsonStr = text.replace(/^```json/i, '').replace(/```$/, '').trim();
+      const result = JSON.parse(jsonStr);
+
+      // Update the deal item details with parsed values
+      item.title = result.productTitle;
+      item.price = result.price;
+      item.marketPriceEstimate = result.marketPriceEstimate;
+
+      const totalCost = item.price + (item.shippingPrice || 0);
+      const estimatedProfit = item.marketPriceEstimate - totalCost;
+
+      return {
+        isDeal: result.isDeal && result.safetyScore >= 70 && estimatedProfit > 1000,
+        reasoning: result.reasoning,
+        estimatedResaleValue: item.marketPriceEstimate,
+        estimatedProfit,
+        confidenceScore: 85,
+        safetyScore: result.safetyScore
+      };
+
+    } catch (error: any) {
+      console.error(`[Evaluator] Error parsing Telegram post with Gemini: ${error.message}`);
+      return this.parseTelegramWithHeuristics(item);
+    }
+  }
+
+  private parseTelegramWithHeuristics(item: DealItem): EvaluationResult {
+    // Simple regex fallback to extract prices from text (e.g. "Rs. 36990" or "at 36,990")
+    const text = item.description || '';
+    const prices = text.replace(/,/g, '').match(/\b\d{4,5}\b/g);
+    
+    let price = 0;
+    if (prices && prices.length > 0) {
+      price = Math.min(...prices.map(p => parseInt(p, 10)));
+    }
+
+    if (price > 0) {
+      item.title = item.description?.split('\n')[0].substring(0, 60) || 'Telegram Deal Product';
+      item.price = price;
+      item.marketPriceEstimate = price * 1.3; // assume retail is 30% higher
+      
+      const totalCost = item.price;
+      const estimatedProfit = item.marketPriceEstimate - totalCost;
+
+      return {
+        isDeal: estimatedProfit > 1500,
+        reasoning: 'Parsed price from text using basic heuristics. Looks profitable.',
+        estimatedResaleValue: item.marketPriceEstimate,
+        estimatedProfit,
+        confidenceScore: 50,
+        safetyScore: 80
+      };
+    }
+
+    return {
+      isDeal: false,
+      reasoning: 'Could not extract valid deal pricing from Telegram post using heuristics.',
+      estimatedResaleValue: 0,
+      estimatedProfit: 0,
+      confidenceScore: 90,
+      safetyScore: 100
+    };
   }
 
   private async evaluateWithAI(item: DealItem, totalCost: number): Promise<EvaluationResult> {
@@ -61,23 +155,22 @@ Listing Info:
 
 Evaluate the text carefully:
 1. Detect scams or red flags: "FOR PARTS ONLY", "parts only", "cracked", "shattered", "icloud locked", "bad imei/esn", "box only", "accessory only", "as-is", "untested", "water damaged".
-2. Estimate the actual resale value in ${currencyLabel} based on typical current second-hand pricing for this item in this condition in India/US.
+2. Estimate the actual resale value in ${currencyLabel} based on typical current second-hand pricing for this item in this state.
 3. Calculate if purchasing at ${currencySymbol}${totalCost} provides at least a 20% profit margin after resale.
 
 Response Format:
-You must output a JSON object matching this schema. Do NOT include markdown code block formatting (like \`\`\`json). Output raw text JSON only.
+You must output a JSON object matching this schema. Do NOT include markdown code block formatting. Output raw text JSON only.
 {
-  "isDeal": boolean, // true only if true resale value is higher than cost and has low risk
-  "reasoning": "string (1-2 sentences summarizing profit potential or warning)",
-  "estimatedResaleValue": number, // true market value in current state in the target currency
-  "confidenceScore": number, // 0-100 (rating of your valuation confidence)
-  "safetyScore": number // 0-100 (score safety. Deduct points for lock status, damage, parts only. Below 60 is unsafe)
+  "isDeal": boolean,
+  "reasoning": "string",
+  "estimatedResaleValue": number,
+  "confidenceScore": number,
+  "safetyScore": number
 }
 `;
 
       const response = await model.generateContent(prompt);
       const text = response.response.text().trim();
-      
       const jsonStr = text.replace(/^```json/i, '').replace(/```$/, '').trim();
       const aiResult = JSON.parse(jsonStr);
 
@@ -106,7 +199,6 @@ You must output a JSON object matching this schema. Do NOT include markdown code
     let safetyScore = 100;
     let reasoning = 'Matches positive arbitrage math. Condition looks good.';
 
-    // Check common red flags
     const redFlags = ['parts only', 'parts', 'cracked', 'shattered', 'icloud', 'locked', 'bad imei', 'box only', 'read desc', 'broken', 'water damage', 'damaged'];
     for (const flag of redFlags) {
       if (titleLower.includes(flag) || descLower.includes(flag) || conditionLower.includes(flag)) {

@@ -4,8 +4,7 @@ import { DealItem, Scraper } from './types';
 import { MockScraper } from './scrapers/mock';
 import { EbayScraper } from './scrapers/ebay';
 import { SlickdealsScraper } from './scrapers/slickdeals';
-import { AmazonInScraper } from './scrapers/amazon_in';
-import { FlipkartScraper } from './scrapers/flipkart';
+import { TelegramScraper } from './scrapers/telegram';
 import { DealEvaluator } from './evaluator';
 import { DealNotifier } from './notifier';
 
@@ -29,11 +28,11 @@ class DealFinderApp {
       console.log('[App] Booting in MOCK MODE (using mock listings feed).');
       this.scrapers.push(new MockScraper());
     } else {
-      console.log('[App] Booting in LIVE MODE (Scraping live Indian & Global marketplaces).');
-      this.scrapers.push(new AmazonInScraper());
-      this.scrapers.push(new FlipkartScraper());
-      this.scrapers.push(new EbayScraper());
+      console.log('[App] Booting in LIVE MODE (Scraping live Telegram Curation channels).');
+      // We use TelegramScraper as our primary cloud-safe scraper for Indian deals
+      this.scrapers.push(new TelegramScraper());
       this.scrapers.push(new SlickdealsScraper());
+      this.scrapers.push(new EbayScraper());
     }
   }
 
@@ -49,11 +48,11 @@ class DealFinderApp {
         for (const item of items) {
           if (this.notifiedDeals.has(item.id)) continue;
 
-          console.log(`[App] Evaluating item: "${item.title}" (${item.currency === 'INR' ? '₹' : '$'}${item.price})`);
+          console.log(`[App] Evaluating item: "${item.title}"`);
           const evaluation = await this.evaluator.evaluate(item);
 
           if (evaluation.isDeal) {
-            console.log(`[App] Profit opportunity found! Profit: +${item.currency === 'INR' ? '₹' : '$'}${evaluation.estimatedProfit.toFixed(2)}`);
+            console.log(`[App] Profit opportunity found! Title: "${item.title}" | Profit: +${item.currency === 'INR' ? '₹' : '$'}${evaluation.estimatedProfit.toFixed(2)}`);
             await this.notifier.notify(item, evaluation);
             this.notifiedDeals.add(item.id);
           } else {
