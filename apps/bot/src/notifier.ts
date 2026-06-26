@@ -118,20 +118,20 @@ export class DealNotifier {
     symbol: string
   ): Promise<void> {
     try {
-      const text = `🚨 <b>ARBITRAGE DEAL ALERT [${item.source.toUpperCase()}]</b>
-      
-<a href="${affiliateUrl}"><b>${item.title}</b></a>
+      const savings = item.marketPriceEstimate - item.price;
+      const savingsPercent = item.marketPriceEstimate > 0 ? ((savings / item.marketPriceEstimate) * 100).toFixed(0) : '0';
+      const storeName = item.source === 'amazon_in' ? 'Amazon India' : 'Flipkart';
 
-💰 <b>Price:</b> ${symbol}${item.price.toFixed(2)} (+${symbol}${(item.shippingPrice || 0).toFixed(2)} ship)
-📉 <b>Resale Est:</b> ${symbol}${evaluation.estimatedResaleValue.toFixed(2)}
-💵 <b>Profit Est:</b> <b>+${symbol}${profit.toFixed(2)}</b> (${roi}% ROI)
-🛡️ <b>Safety Score:</b> ${evaluation.safetyScore}/100
-🏷️ <b>Condition:</b> ${item.condition || 'Used'}
+      const text = `🔥 <b>DEAL ALERT: ${item.title}</b>
 
-🤖 <b>AI Analysis:</b>
+⚡ <b>Super discount on ${storeName}!</b>
+❌ <b>Original Price:</b> ${symbol}${item.marketPriceEstimate.toLocaleString('en-IN')}
+✅ <b>Deal Price:</b> ${symbol}${item.price.toLocaleString('en-IN')} (Save ${savingsPercent}%)
+
+📝 <b>About this product:</b>
 <i>${evaluation.reasoning}</i>
 
-👉 <a href="${affiliateUrl}">View Listing Now</a>`;
+👉 <a href="${affiliateUrl}"><b>BUY NOW ON ${storeName.toUpperCase()}</b></a>`;
 
       if (item.imageUrl) {
         const url = `https://api.telegram.org/bot${this.telegramToken}/sendPhoto`;
