@@ -2,7 +2,7 @@ name: Deal Scraper Bot
 
 on:
   schedule:
-    - cron: '*/20 * * * *' # Runs automatically every 20 minutes
+    - cron: '*/5 * * * *' # Runs automatically every 5 minutes (maximum cloud frequency)
   workflow_dispatch: # Allows you to run the bot manually from your GitHub dashboard
 
 jobs:
