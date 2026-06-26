@@ -50,7 +50,7 @@ export class DealEvaluator {
     try {
       const model = this.ai!.getGenerativeModel({ model: 'gemini-1.5-flash' });
       
-      const prompt = `You are an expert shopping deal aggregator and product flipper.
+      const prompt = `You are an expert shopping deal aggregator and consumer copywriter.
 Analyze this social media post sharing a shopping offer and extract the underlying deal details.
 
 Post Content:
@@ -62,7 +62,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
   "price": number (The actual deal purchase price in INR, e.g. 52999. If a range is given, use the lowest applicable price),
   "marketPriceEstimate": number (The typical normal retail price or MSRP of this item in India. If not specified, estimate a realistic market value),
   "isDeal": boolean (true if the deal price offers a significant discount of at least 20% compared to typical retail price),
-  "reasoning": "string (1-2 sentences highlighting the key benefits of the product and explaining why it is a great purchase at this discounted price, written to convince a consumer to buy it)",
+  "reasoning": "string (A highly attractive, high-converting product description written for end customers. It must highlight 2-3 key features with emojis, specify who it is perfect for, and create urgency. Use simple unicode bullet points like '•' or emoji bullet points like '✨'. You can use standard HTML tags like <b>bold</b> and <i>italic</i> for formatting if needed, but do NOT use Markdown asterisk symbols. Keep it concise but extremely persuasive to drive immediate impulse buys)",
   "safetyScore": number // 0-100 (Deduct points if the post indicates the item is used, refurbished, damaged, box-only, or a suspicious clone. New items from Amazon/Flipkart should be 100)
 }
 `;

@@ -66,7 +66,7 @@ export class TelegramScraper implements Scraper {
             continue;
           }
 
-          // Extract post photo image URL
+          // Extract post photo image URL (as a fallback)
           const photoEl = $(element).find('.tgme_widget_message_photo_wrap');
           let imageUrl = '';
           if (photoEl.length > 0) {
@@ -77,6 +77,16 @@ export class TelegramScraper implements Scraper {
             }
           }
 
+          // Attempt to extract the real product image and clean title from the target store page
+          console.log(`[Telegram Scraper] Fetching target page to extract real product image: ${resolvedUrl}`);
+          const storeMeta = await this.fetchProductImageAndTitle(resolvedUrl);
+          if (storeMeta.imageUrl && storeMeta.imageUrl.startsWith('http')) {
+            console.log(`[Telegram Scraper] Found real product image: ${storeMeta.imageUrl}`);
+            imageUrl = storeMeta.imageUrl;
+          } else {
+            console.log(`[Telegram Scraper] No product image found on store page. Using Telegram post photo as fallback.`);
+          }
+
           // Generate stable ID from Telegram message path
           const msgLink = $(element).find('a.tgme_widget_message_date').attr('href') || '';
           const msgIdMatch = msgLink.match(/\/(\d+)$/);
@@ -85,16 +95,20 @@ export class TelegramScraper implements Scraper {
           // Deduplicate
           if (allDeals.some(deal => deal.id === id)) continue;
 
+          // Prepare description. If we extracted a clean title from the store, append it so Gemini has better context
+          const cleanStoreTitle = storeMeta.title ? `[Product Title: ${storeMeta.title}] ` : '';
+          const descriptionWithContext = `${cleanStoreTitle}${text}`;
+
           allDeals.push({
             id,
-            title: text.substring(0, 100) + '...', // placeholder, Gemini will parse the real title
+            title: storeMeta.title || (text.substring(0, 100) + '...'),
             price: 0, // Gemini will parse the real price
             shippingPrice: 0,
             marketPriceEstimate: 0, // Gemini will parse the retail price
             url: resolvedUrl,
             imageUrl,
             source,
-            description: text, // pass the full post content as description for Gemini to evaluate
+            description: descriptionWithContext, // pass description with context for Gemini to evaluate
             condition: 'New',
             currency: 'INR',
             timestamp: Date.now()
@@ -115,6 +129,41 @@ export class TelegramScraper implements Scraper {
     }
 
     return allDeals;
+  }
+
+  /**
+   * Attempts to fetch the product page and extract the real product image (from og:image)
+   * and clean product title. Falls back to original values if blocked or failed.
+   */
+  private async fetchProductImageAndTitle(url: string): Promise<{ imageUrl?: string; title?: string }> {
+    try {
+      const res = await axios.get(url, {
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5'
+        }
+      });
+      const $ = cheerio.load(res.data);
+      
+      // Amazon/Flipkart standard OpenGraph tags
+      const ogImage = $('meta[property="og:image"]').attr('content') || 
+                      $('meta[name="twitter:image"]').attr('content') || 
+                      $('#landingImage').attr('src') || 
+                      $('#imgBlkFront').attr('src');
+      
+      const ogTitle = $('meta[property="og:title"]').attr('content') || 
+                      $('title').text();
+                      
+      return {
+        imageUrl: ogImage?.trim(),
+        title: ogTitle?.trim()
+      };
+    } catch (error: any) {
+      console.log(`[Telegram Scraper] Fetching product page metadata failed or was blocked: ${error.message}`);
+      return {};
+    }
   }
 
   /**
