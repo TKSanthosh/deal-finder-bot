@@ -1,0 +1,40 @@
+name: Deal Scraper Bot
+
+on:
+  schedule:
+    - cron: '*/20 * * * *' # Runs automatically every 20 minutes
+  workflow_dispatch: # Allows you to run the bot manually from your GitHub dashboard
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          npm install
+
+      - name: Run Scrape Cycle
+        run: |
+          npx ts-node apps/bot/src/run-once.ts
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          PINTEREST_BOARD_ID: ${{ secrets.PINTEREST_BOARD_ID }}
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+          AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
+          AMAZON_IN_TAG: ${{ secrets.AMAZON_IN_TAG }}
+          FLIPKART_AFFID: ${{ secrets.FLIPKART_AFFID }}
+          MOCK_MODE: 'false' # Run live scrapers on Indian and global marketplaces
