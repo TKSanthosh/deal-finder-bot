@@ -9,7 +9,7 @@
     "url": "https://www.amazon.in/dp/B0009I9Z8Q/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782500631368
+    "timestamp": 1782501889303
   },
   {
     "id": "tg-idoffers-135254",
@@ -21,7 +21,7 @@
     "url": "https://www.amazon.in/dp/B0C3LHV43S/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782500630649
+    "timestamp": 1782501888459
   },
   {
     "id": "tg-idoffers-135248",
@@ -33,7 +33,7 @@
     "url": "https://www.amazon.in/dp/B0GNR9J45L/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782500629490
+    "timestamp": 1782501887187
   },
   {
     "id": "tg-idoffers-135241",
@@ -45,7 +45,7 @@
     "url": "https://dl.flipkart.com/dl/associate/open?affid=mockaffid&url=https%3A%2F%2Fdl.flipkart.com%2Fs%2FgRwH8PuuuN",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "flipkart",
-    "timestamp": 1782500628091
+    "timestamp": 1782501885058
   },
   {
     "id": "tg-idoffers-135238",
@@ -57,7 +57,7 @@
     "url": "https://www.amazon.in/dp/B0D32FSQB5/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782500626726
+    "timestamp": 1782501883946
   },
   {
     "id": "tg-idoffers-135237",
@@ -69,6 +69,6 @@
     "url": "https://amzn.to/3QZq9CC",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782500624999
+    "timestamp": 1782501882456
   }
 ]
