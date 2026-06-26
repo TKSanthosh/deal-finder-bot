@@ -12,7 +12,8 @@
     "@google/generative-ai": "^0.21.0",
     "axios": "^1.6.8",
     "cheerio": "^1.0.0-rc.12",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "twitter-api-v2": "^1.16.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",

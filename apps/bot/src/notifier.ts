@@ -2,6 +2,9 @@ import axios from 'axios';
 import { DealItem, EvaluationResult } from './types';
 import { AffiliateLinkGenerator } from './affiliate';
 import { PinterestClient } from './pinterest';
+import { TwitterApi } from 'twitter-api-v2';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class DealNotifier {
   private discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
@@ -10,6 +13,15 @@ export class DealNotifier {
 
   private affiliate = new AffiliateLinkGenerator();
   private pinterest = new PinterestClient();
+
+  private twitterClient = (process.env.TWITTER_APP_KEY && process.env.TWITTER_APP_SECRET && process.env.TWITTER_ACCESS_TOKEN && process.env.TWITTER_ACCESS_SECRET)
+    ? new TwitterApi({
+        appKey: process.env.TWITTER_APP_KEY,
+        appSecret: process.env.TWITTER_APP_SECRET,
+        accessToken: process.env.TWITTER_ACCESS_TOKEN,
+        accessSecret: process.env.TWITTER_ACCESS_SECRET,
+      })
+    : null;
 
   async notify(item: DealItem, evaluation: EvaluationResult): Promise<void> {
     const totalCost = item.price + (item.shippingPrice || 0);
@@ -23,18 +35,27 @@ export class DealNotifier {
     // 2. Console Log Alert
     this.logToConsole(item, evaluation, totalCost, profit, roi, affiliateUrl, symbol);
 
-    // 3. Auto-Pin to Pinterest Board
+    // 3. Save to live website JSON feed (Option A)
+    this.saveToJSONFeed(item, evaluation, affiliateUrl);
+
+    // 4. Auto-Pin to Pinterest Board
     await this.pinterest.createPin(item, evaluation, affiliateUrl);
 
-    // 4. Dispatch to Discord Webhook
+    // 5. Dispatch to Discord Webhook
     if (this.discordWebhookUrl) {
       await this.notifyDiscord(item, evaluation, totalCost, profit, roi, affiliateUrl, symbol);
     }
 
-    // 5. Dispatch to Telegram Channel
+    // 6. Dispatch to Telegram Channel
     if (this.telegramToken && this.telegramChatId) {
       await this.notifyTelegram(item, evaluation, totalCost, profit, roi, affiliateUrl, symbol);
     }
+
+    // 7. Auto-Post to Twitter/X (Option B)
+    await this.notifyTwitter(item, evaluation, affiliateUrl);
+
+    // 8. Auto-Post to Reddit (Option B)
+    await this.notifyReddit(item, evaluation, affiliateUrl);
   }
 
   private logToConsole(
@@ -153,6 +174,144 @@ export class DealNotifier {
       console.log('[Notifier] Telegram notification sent successfully.');
     } catch (error: any) {
       console.error('[Notifier] Error sending Telegram message:', error.message);
+    }
+  }
+
+  private saveToJSONFeed(item: DealItem, evaluation: EvaluationResult, affiliateUrl: string): void {
+    try {
+      const feedPath = path.join(__dirname, '../../web/public/deals.json');
+      const feedDir = path.dirname(feedPath);
+
+      if (!fs.existsSync(feedDir)) {
+        fs.mkdirSync(feedDir, { recursive: true });
+      }
+
+      let deals: any[] = [];
+      if (fs.existsSync(feedPath)) {
+        try {
+          const content = fs.readFileSync(feedPath, 'utf8');
+          deals = JSON.parse(content);
+        } catch (e) {
+          console.error('[Notifier] Error reading existing deals.json:', e);
+          deals = [];
+        }
+      }
+
+      const savings = item.marketPriceEstimate - item.price;
+      const savingsPercent = item.marketPriceEstimate > 0 ? ((savings / item.marketPriceEstimate) * 100).toFixed(0) : '0';
+
+      const newDeal = {
+        id: item.id,
+        title: item.title,
+        price: item.price,
+        marketPriceEstimate: item.marketPriceEstimate,
+        savingsPercent,
+        imageUrl: item.imageUrl || '',
+        url: affiliateUrl,
+        description: evaluation.reasoning,
+        source: item.source,
+        timestamp: Date.now()
+      };
+
+      // Add to front, remove duplicates, limit to 10
+      deals = [newDeal, ...deals.filter((d: any) => d.id !== item.id)];
+      deals = deals.slice(0, 10);
+
+      fs.writeFileSync(feedPath, JSON.stringify(deals, null, 2), 'utf8');
+      console.log(`[Notifier] Updated deals.json with new deal: ${item.title}`);
+    } catch (error: any) {
+      console.error('[Notifier] Failed to write to deals.json:', error.message);
+    }
+  }
+
+  private async notifyTwitter(item: DealItem, evaluation: EvaluationResult, affiliateUrl: string): Promise<void> {
+    try {
+      if (!this.twitterClient) {
+        console.log('[Notifier] Twitter credentials not configured. Skipping Twitter post.');
+        return;
+      }
+
+      console.log(`[Notifier] Posting deal to Twitter/X...`);
+
+      const cleanReasoning = evaluation.reasoning.replace(/<[^>]*>/g, ''); // strip HTML tags
+
+      let tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
+      tweetText += `💰 Deal Price: ₹${item.price.toLocaleString('en-IN')}\n`;
+      tweetText += `📝 ${cleanReasoning.substring(0, 100)}...\n\n`;
+      tweetText += `👉 Buy Now: ${affiliateUrl}\n`;
+      tweetText += `⚡ Join Telegram: t.me/dealradarindia2002`;
+
+      if (tweetText.length > 280) {
+        const diff = tweetText.length - 280;
+        const availableReasoning = 100 - diff - 5;
+        const shortReasoning = availableReasoning > 0 ? cleanReasoning.substring(0, availableReasoning) + '...' : '';
+        tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
+        tweetText += `💰 Price: ₹${item.price.toLocaleString('en-IN')}\n`;
+        if (shortReasoning) tweetText += `📝 ${shortReasoning}\n\n`;
+        tweetText += `👉 Buy Now: ${affiliateUrl}\n`;
+        tweetText += `⚡ Join Telegram: t.me/dealradarindia2002`;
+      }
+
+      await this.twitterClient.v2.tweet(tweetText);
+      console.log('[Notifier] Successfully posted to Twitter/X!');
+    } catch (error: any) {
+      console.error('[Notifier] Error posting to Twitter/X:', error.message);
+    }
+  }
+
+  private async notifyReddit(item: DealItem, evaluation: EvaluationResult, affiliateUrl: string): Promise<void> {
+    try {
+      const clientId = process.env.REDDIT_CLIENT_ID;
+      const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+      const username = process.env.REDDIT_USERNAME;
+      const password = process.env.REDDIT_PASSWORD;
+      const subreddit = process.env.REDDIT_SUBREDDIT || 'dealsindia';
+
+      if (!clientId || !clientSecret || !username || !password) {
+        console.log('[Notifier] Reddit credentials not configured. Skipping Reddit post.');
+        return;
+      }
+
+      console.log(`[Notifier] Posting deal to Reddit r/${subreddit}...`);
+
+      const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const tokenRes = await axios.post('https://www.reddit.com/api/v1/access_token',
+        `grant_type=password&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+        {
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'DealBot/1.0 by DealsRadarBot'
+          }
+        }
+      );
+
+      const token = tokenRes.data.access_token;
+      if (!token) throw new Error('Failed to retrieve access token from Reddit.');
+
+      const cleanReasoning = evaluation.reasoning.replace(/<[^>]*>/g, ''); // strip HTML tags
+      const postTitle = `[Deal Alert] ${item.title} - Only ₹${item.price.toLocaleString('en-IN')}!`;
+
+      await axios.post('https://oauth.reddit.com/api/submit',
+        new URLSearchParams({
+          sr: subreddit,
+          kind: 'link',
+          title: postTitle,
+          url: affiliateUrl,
+          sendreplies: 'true'
+        }),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'DealBot/1.0 by DealsRadarBot',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      console.log(`[Notifier] Successfully posted to Reddit r/${subreddit}!`);
+    } catch (error: any) {
+      console.error('[Notifier] Error posting to Reddit:', error.response?.data || error.message);
     }
   }
 }
