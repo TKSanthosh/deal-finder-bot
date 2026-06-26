@@ -4,8 +4,7 @@ import { DealItem, Scraper } from './types';
 import { MockScraper } from './scrapers/mock';
 import { EbayScraper } from './scrapers/ebay';
 import { SlickdealsScraper } from './scrapers/slickdeals';
-import { AmazonInScraper } from './scrapers/amazon_in';
-import { FlipkartScraper } from './scrapers/flipkart';
+import { TelegramScraper } from './scrapers/telegram';
 import { DealEvaluator } from './evaluator';
 import { DealNotifier } from './notifier';
 
@@ -25,10 +24,9 @@ async function run() {
     scrapers.push(new MockScraper());
   } else {
     console.log('[RunOnce] Live Mode Active. Initializing Scrapers.');
-    scrapers.push(new AmazonInScraper());
-    scrapers.push(new FlipkartScraper());
-    scrapers.push(new EbayScraper());
+    scrapers.push(new TelegramScraper());
     scrapers.push(new SlickdealsScraper());
+    scrapers.push(new EbayScraper());
   }
 
   const evaluator = new DealEvaluator();
