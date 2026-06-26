@@ -55,12 +55,15 @@ export class TelegramScraper implements Scraper {
           const resolvedUrl = await this.resolveShortLink(dealLink);
           console.log(`[Telegram Scraper] Resolved URL: ${resolvedUrl}`);
 
-          // Classify source platform
-          let source: 'amazon_in' | 'flipkart' | 'ebay' | 'mock' = 'amazon_in';
-          if (resolvedUrl.includes('flipkart.com')) {
+          // Classify source platform and filter out unsupported stores (like Meesho, Myntra, etc.)
+          let source: 'amazon_in' | 'flipkart' | 'ebay' | 'mock';
+          if (resolvedUrl.includes('amazon.in')) {
+            source = 'amazon_in';
+          } else if (resolvedUrl.includes('flipkart.com')) {
             source = 'flipkart';
-          } else if (resolvedUrl.includes('ebay.com')) {
-            source = 'ebay';
+          } else {
+            console.log(`[Telegram Scraper] Skipping unsupported store domain: ${resolvedUrl}`);
+            continue;
           }
 
           // Extract post photo image URL
