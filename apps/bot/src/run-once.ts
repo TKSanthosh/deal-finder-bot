@@ -12,7 +12,12 @@ import { DealNotifier } from './notifier';
 dotenv.config({ path: path.join(__dirname, '../.env') });
 dotenv.config();
 
-const KEYWORDS = ['playstation 5', 'ps5 slim', 'iphone 15 pro', 'oneplus 12', 'rtx 4060', 'steam deck', 'nintendo switch'];
+const KEYWORDS = [
+  'playstation', 'ps5', 'xbox', 'nintendo', 'switch', 'steam deck',
+  'iphone', 'ipad', 'macbook', 'airpods',
+  'oneplus', 'samsung galaxy', 'pixel', 'realme', 'redmi',
+  'laptop', 'rtx', 'gpu', 'monitor', 'ssd', 'smartwatch', 'earbuds'
+];
 
 async function run() {
   console.log('🚀 Starting Single Scrape Cycle...');

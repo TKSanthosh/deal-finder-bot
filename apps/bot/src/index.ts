@@ -11,7 +11,12 @@ import { DealNotifier } from './notifier';
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const KEYWORDS = ['playstation 5', 'ps5 slim', 'iphone 15 pro', 'oneplus 12', 'rtx 4060', 'steam deck', 'nintendo switch'];
+const KEYWORDS = [
+  'playstation', 'ps5', 'xbox', 'nintendo', 'switch', 'steam deck',
+  'iphone', 'ipad', 'macbook', 'airpods',
+  'oneplus', 'samsung galaxy', 'pixel', 'realme', 'redmi',
+  'laptop', 'rtx', 'gpu', 'monitor', 'ssd', 'smartwatch', 'earbuds'
+];
 
 class DealFinderApp {
   private scrapers: Scraper[] = [];
