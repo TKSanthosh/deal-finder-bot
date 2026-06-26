@@ -56,10 +56,11 @@ export class TelegramScraper implements Scraper {
           console.log(`[Telegram Scraper] Resolved URL: ${resolvedUrl}`);
 
           // Classify source platform and filter out unsupported stores (like Meesho, Myntra, etc.)
+          // IMPORTANT: amzn.to and fkrt.it links that fail to resolve should still be treated as Amazon/Flipkart
           let source: 'amazon_in' | 'flipkart' | 'ebay' | 'mock';
-          if (resolvedUrl.includes('amazon.in')) {
+          if (resolvedUrl.includes('amazon.in') || resolvedUrl.includes('amzn.to') || resolvedUrl.includes('amzn.in')) {
             source = 'amazon_in';
-          } else if (resolvedUrl.includes('flipkart.com')) {
+          } else if (resolvedUrl.includes('flipkart.com') || resolvedUrl.includes('fkrt.it') || resolvedUrl.includes('dl.flipkart.com')) {
             source = 'flipkart';
           } else {
             console.log(`[Telegram Scraper] Skipping unsupported store domain: ${resolvedUrl}`);
@@ -119,14 +120,10 @@ export class TelegramScraper implements Scraper {
       }
     }
 
-    // Filter deals by keywords if user has specified any search restrictions
-    if (keywords.length > 0) {
-      return allDeals.filter(deal => 
-        keywords.some(kw => 
-          deal.description && deal.description.toLowerCase().includes(kw.toLowerCase())
-        )
-      );
-    }
+    // Skip keyword filtering — the source Telegram channels are already curated deal channels.
+    // Filtering here was causing 0 results because many posts don't contain exact tech keywords.
+    // Let the AI evaluator (Gemini) decide what qualifies as a deal instead.
+    console.log(`[Telegram Scraper] Total deals collected before evaluation: ${allDeals.length}`);
 
     return allDeals;
   }
@@ -171,10 +168,10 @@ export class TelegramScraper implements Scraper {
    */
   private async resolveShortLink(url: string): Promise<string> {
     try {
-      // Try HEAD request first for speed
+      // Try HEAD request first for speed — increased redirects and timeout for cloud reliability
       const res = await axios.head(url, {
-        maxRedirects: 4,
-        timeout: 4000,
+        maxRedirects: 10,
+        timeout: 8000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
@@ -184,8 +181,8 @@ export class TelegramScraper implements Scraper {
       // Fallback to GET if HEAD is rejected by server
       try {
         const res = await axios.get(url, {
-          maxRedirects: 4,
-          timeout: 4000,
+          maxRedirects: 10,
+          timeout: 8000,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           }
