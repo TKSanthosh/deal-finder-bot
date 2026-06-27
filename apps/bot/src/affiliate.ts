@@ -5,7 +5,8 @@ export class AffiliateLinkGenerator {
   private flipkartAffid = process.env.FLIPKART_AFFID || 'mockaffid';
 
   /**
-   * Translates raw product URLs into tracking affiliate links
+   * Translates raw product URLs into tracking affiliate links.
+   * IMPORTANT: Always preserves the original product URL to prevent wrong redirects.
    */
   generate(url: string, source: string): string {
     if (!url) return url;
@@ -15,7 +16,7 @@ export class AffiliateLinkGenerator {
         return this.buildEbayAffiliateLink(url);
       }
 
-      if (url.includes('amazon.in')) {
+      if (url.includes('amazon.in') || url.includes('amzn.to') || url.includes('amzn.in')) {
         return this.buildAmazonInAffiliateLink(url);
       }
 
@@ -23,7 +24,7 @@ export class AffiliateLinkGenerator {
         return this.buildAmazonAffiliateLink(url);
       }
 
-      if (source === 'flipkart' || url.includes('flipkart.com')) {
+      if (source === 'flipkart' || url.includes('flipkart.com') || url.includes('fkrt.it')) {
         return this.buildFlipkartAffiliateLink(url);
       }
 
@@ -47,29 +48,43 @@ export class AffiliateLinkGenerator {
   }
 
   private buildAmazonAffiliateLink(rawUrl: string): string {
-    const asinMatch = rawUrl.match(/\/dp\/([A-Z0-9]{10})|\/gp\/product\/([A-Z0-9]{10})/i);
-    const asin = asinMatch ? (asinMatch[1] || asinMatch[2]) : null;
-    if (!asin) return rawUrl;
-    return `https://www.amazon.com/dp/${asin}/?tag=${this.amazonTag}`;
+    return this.appendAmazonTag(rawUrl, this.amazonTag);
   }
 
   private buildAmazonInAffiliateLink(rawUrl: string): string {
-    // Amazon India uses standard ASIN structure but localized tag (-21 suffix)
-    const asinMatch = rawUrl.match(/\/dp\/([A-Z0-9]{10})|\/gp\/product\/([A-Z0-9]{10})/i);
-    const asin = asinMatch ? (asinMatch[1] || asinMatch[2]) : null;
-    if (!asin) return rawUrl;
-    return `https://www.amazon.in/dp/${asin}/?tag=${this.amazonInTag}`;
+    return this.appendAmazonTag(rawUrl, this.amazonInTag);
+  }
+
+  /**
+   * Appends affiliate tag to Amazon URL while preserving the original product link.
+   * Handles all URL formats: /dp/ASIN, /gp/product/ASIN, short URLs, etc.
+   */
+  private appendAmazonTag(rawUrl: string, tag: string): string {
+    try {
+      const urlObj = new URL(rawUrl);
+      // Remove any existing affiliate tag
+      urlObj.searchParams.delete('tag');
+      // Append our affiliate tag
+      urlObj.searchParams.set('tag', tag);
+      return urlObj.toString();
+    } catch {
+      // If URL parsing fails (e.g. malformed URL), append tag as simple string
+      const separator = rawUrl.includes('?') ? '&' : '?';
+      return `${rawUrl}${separator}tag=${tag}`;
+    }
   }
 
   private buildFlipkartAffiliateLink(rawUrl: string): string {
-    // Strip existing URL parameters for clean tracking
-    const cleanUrl = rawUrl.split('?')[0];
-    
-    // Flipkart Affiliate API redirect wrapper
+    if (this.flipkartAffid === 'mockaffid') {
+      // No real affiliate ID configured, return original URL
+      return rawUrl;
+    }
+
+    // Flipkart Affiliate API redirect wrapper — preserve full URL including query params
     const base = 'https://dl.flipkart.com/dl/associate/open';
     const params = new URLSearchParams({
       affid: this.flipkartAffid,
-      url: cleanUrl
+      url: rawUrl   // Keep full URL with all query params intact
     });
     return `${base}?${params.toString()}`;
   }

@@ -26,7 +26,7 @@ export class DealNotifier {
   async notify(item: DealItem, evaluation: EvaluationResult): Promise<void> {
     const totalCost = item.price + (item.shippingPrice || 0);
     const profit = evaluation.estimatedProfit;
-    const roi = ((profit / totalCost) * 100).toFixed(0);
+    const roi = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(0) : '0';
     const symbol = item.currency === 'INR' ? '₹' : '$';
 
     // 1. Generate Affiliate Link
@@ -35,7 +35,7 @@ export class DealNotifier {
     // 2. Console Log Alert
     this.logToConsole(item, evaluation, totalCost, profit, roi, affiliateUrl, symbol);
 
-    // 3. Save to live website JSON feed (Option A)
+    // 3. Save to live website JSON feed
     this.saveToJSONFeed(item, evaluation, affiliateUrl);
 
     // 4. Auto-Pin to Pinterest Board
@@ -51,10 +51,10 @@ export class DealNotifier {
       await this.notifyTelegram(item, evaluation, totalCost, profit, roi, affiliateUrl, symbol);
     }
 
-    // 7. Auto-Post to Twitter/X (Option B)
+    // 7. Auto-Post to Twitter/X
     await this.notifyTwitter(item, evaluation, affiliateUrl);
 
-    // 8. Auto-Post to Reddit (Option B)
+    // 8. Auto-Post to Reddit
     await this.notifyReddit(item, evaluation, affiliateUrl);
   }
 
@@ -67,7 +67,7 @@ export class DealNotifier {
     affiliateUrl: string,
     symbol: string
   ): void {
-    const color = evaluation.safetyScore > 80 ? '\x1b[32m' : '\x1b[33m'; // Green vs Yellow
+    const color = evaluation.safetyScore > 80 ? '\x1b[32m' : '\x1b[33m';
     const reset = '\x1b[0m';
     const bold = '\x1b[1m';
 
@@ -95,7 +95,7 @@ export class DealNotifier {
     symbol: string
   ): Promise<void> {
     try {
-      const embedColor = evaluation.safetyScore > 80 ? 3066993 : 15105570; // Green or Orange
+      const embedColor = evaluation.safetyScore > 80 ? 3066993 : 15105570;
 
       const embed: any = {
         title: `🚨 Arbitrage Deal Alert: ${item.source.toUpperCase()}`,
@@ -137,6 +137,49 @@ export class DealNotifier {
       .replace(/>/g, '&gt;');
   }
 
+  /**
+   * Safely truncate HTML text for Telegram captions without breaking tags.
+   * Strips all HTML tags before truncating, then the message uses plain text within the template.
+   */
+  private safeTruncate(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text;
+
+    // Find the last complete HTML tag boundary before maxLen
+    let truncated = text.substring(0, maxLen);
+
+    // Check if we're in the middle of an HTML tag
+    const lastOpenBracket = truncated.lastIndexOf('<');
+    const lastCloseBracket = truncated.lastIndexOf('>');
+
+    if (lastOpenBracket > lastCloseBracket) {
+      // We're inside a tag — cut before it
+      truncated = truncated.substring(0, lastOpenBracket);
+    }
+
+    // Close any unclosed tags
+    const openTags: string[] = [];
+    const tagRegex = /<\/?([a-z]+)[^>]*>/gi;
+    let match;
+    while ((match = tagRegex.exec(truncated)) !== null) {
+      const tag = match[1].toLowerCase();
+      if (match[0].startsWith('</')) {
+        // Closing tag — remove from stack
+        const idx = openTags.lastIndexOf(tag);
+        if (idx !== -1) openTags.splice(idx, 1);
+      } else if (!match[0].endsWith('/>')) {
+        // Opening tag
+        openTags.push(tag);
+      }
+    }
+
+    // Close remaining open tags in reverse order
+    for (let i = openTags.length - 1; i >= 0; i--) {
+      truncated += `</${openTags[i]}>`;
+    }
+
+    return truncated;
+  }
+
   private async notifyTelegram(
     item: DealItem,
     evaluation: EvaluationResult,
@@ -151,9 +194,11 @@ export class DealNotifier {
       const savingsPercent = item.marketPriceEstimate > 0 ? ((savings / item.marketPriceEstimate) * 100).toFixed(0) : '0';
       const storeName = item.source === 'amazon_in' ? 'Amazon India' : 'Flipkart';
 
-      // Escape HTML entities in user-generated content to prevent Telegram 400 errors
+      // Escape HTML entities in user-generated content
       const safeTitle = this.escapeHtml(item.title || 'Great Deal');
       const safeReasoning = this.escapeHtml(evaluation.reasoning || '');
+      // Escape & in URLs for HTML mode
+      const safeUrl = affiliateUrl.replace(/&/g, '&amp;');
 
       const text = `🔥 <b>DEAL ALERT: ${safeTitle}</b>
 
@@ -164,29 +209,36 @@ export class DealNotifier {
 📝 <b>About this product:</b>
 <i>${safeReasoning}</i>
 
-👉 <a href="${affiliateUrl}"><b>BUY NOW ON ${storeName.toUpperCase()}</b></a>`;
+👉 <a href="${safeUrl}"><b>BUY NOW ON ${storeName.toUpperCase()}</b></a>`;
 
-      // Telegram captions are limited to 1024 chars for photos
-      const finalText = item.imageUrl ? text.substring(0, 1024) : text;
-
+      // Try sending with photo first
       if (item.imageUrl) {
-        const url = `https://api.telegram.org/bot${this.telegramToken}/sendPhoto`;
-        await axios.post(url, {
-          chat_id: this.telegramChatId,
-          photo: item.imageUrl,
-          caption: finalText,
-          parse_mode: 'HTML'
-        });
-      } else {
-        const url = `https://api.telegram.org/bot${this.telegramToken}/sendMessage`;
-        await axios.post(url, {
-          chat_id: this.telegramChatId,
-          text: finalText,
-          parse_mode: 'HTML',
-          disable_web_page_preview: false
-        });
+        try {
+          const photoText = this.safeTruncate(text, 1024);
+          const url = `https://api.telegram.org/bot${this.telegramToken}/sendPhoto`;
+          await axios.post(url, {
+            chat_id: this.telegramChatId,
+            photo: item.imageUrl,
+            caption: photoText,
+            parse_mode: 'HTML'
+          });
+          console.log('[Notifier] Telegram photo notification sent successfully.');
+          return;
+        } catch (photoError: any) {
+          console.log(`[Notifier] sendPhoto failed (${photoError.response?.data?.description || photoError.message}), falling back to text message.`);
+          // Fall through to sendMessage
+        }
       }
-      console.log('[Notifier] Telegram notification sent successfully.');
+
+      // Fallback: send as text message (with link preview)
+      const msgUrl = `https://api.telegram.org/bot${this.telegramToken}/sendMessage`;
+      await axios.post(msgUrl, {
+        chat_id: this.telegramChatId,
+        text: text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false
+      });
+      console.log('[Notifier] Telegram text notification sent successfully.');
     } catch (error: any) {
       console.error('[Notifier] Error sending Telegram message:', error.message);
       if (error.response?.data) {
@@ -231,9 +283,9 @@ export class DealNotifier {
         timestamp: Date.now()
       };
 
-      // Add to front, remove duplicates, limit to 10
+      // Add to front, remove duplicates, limit to 50
       deals = [newDeal, ...deals.filter((d: any) => d.id !== item.id)];
-      deals = deals.slice(0, 10);
+      deals = deals.slice(0, 50);
 
       fs.writeFileSync(feedPath, JSON.stringify(deals, null, 2), 'utf8');
       console.log(`[Notifier] Updated deals.json with new deal: ${item.title}`);
@@ -252,34 +304,33 @@ export class DealNotifier {
       console.log(`[Notifier] Posting deal to Twitter/X...`);
 
       const cleanReasoning = evaluation.reasoning.replace(/<[^>]*>/g, ''); // strip HTML tags
-      const tags = `#DealsIndia #LootDeals #AmazonDeals #FlipkartDeals #TechDeals #DiscountIndia #DealsRadar`;
+      const storeName = item.source === 'amazon_in' ? 'Amazon' : 'Flipkart';
+      const tags = `#DealsIndia #LootDeals #${storeName}Deals #DiscountIndia #DealsRadar`;
 
-      // Build the tweet dynamically
-      let tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
-      tweetText += `💰 Deal Price: ₹${item.price.toLocaleString('en-IN')}\n`;
-      tweetText += `📝 ${cleanReasoning.substring(0, 80)}...\n\n`;
-      tweetText += `👉 Buy: ${affiliateUrl}\n`;
-      tweetText += `⚡ Telegram: t.me/dealradarindia2002\n\n`;
+      // Truncate title to fit within 280 chars
+      const maxTitleLen = 60;
+      const shortTitle = item.title.length > maxTitleLen
+        ? item.title.substring(0, maxTitleLen) + '...'
+        : item.title;
+
+      // Build the tweet — keep it compact
+      let tweetText = `🔥 ${shortTitle}\n`;
+      tweetText += `💰 ₹${item.price.toLocaleString('en-IN')}\n`;
+      tweetText += `👉 ${affiliateUrl}\n`;
       tweetText += tags;
 
-      // Adjust length if it exceeds 280 characters
+      // Hard truncate to 280 if still too long
       if (tweetText.length > 280) {
-        const diff = tweetText.length - 280;
-        const availableReasoning = 80 - diff - 5;
-        const shortReasoning = availableReasoning > 0 ? cleanReasoning.substring(0, availableReasoning) + '...' : '';
-        
-        tweetText = `🔥 DEAL ALERT: ${item.title}\n\n`;
-        tweetText += `💰 Price: ₹${item.price.toLocaleString('en-IN')}\n`;
-        if (shortReasoning) tweetText += `📝 ${shortReasoning}\n\n`;
-        tweetText += `👉 Buy: ${affiliateUrl}\n`;
-        tweetText += `⚡ Telegram: t.me/dealradarindia2002\n\n`;
-        tweetText += tags;
+        tweetText = tweetText.substring(0, 277) + '...';
       }
 
       await this.twitterClient.v2.tweet(tweetText);
       console.log('[Notifier] Successfully posted to Twitter/X!');
     } catch (error: any) {
       console.error('[Notifier] Error posting to Twitter/X:', error.message);
+      if (error.data) {
+        console.error('[Notifier] Twitter API response:', JSON.stringify(error.data));
+      }
     }
   }
 
@@ -313,14 +364,13 @@ export class DealNotifier {
       const token = tokenRes.data.access_token;
       if (!token) throw new Error('Failed to retrieve access token from Reddit.');
 
-      const cleanReasoning = evaluation.reasoning.replace(/<[^>]*>/g, ''); // strip HTML tags
       const postTitle = `[Deal Alert] ${item.title} - Only ₹${item.price.toLocaleString('en-IN')}!`;
 
       await axios.post('https://oauth.reddit.com/api/submit',
         new URLSearchParams({
           sr: subreddit,
           kind: 'link',
-          title: postTitle,
+          title: postTitle.substring(0, 300),
           url: affiliateUrl,
           sendreplies: 'true'
         }),

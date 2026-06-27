@@ -26,7 +26,7 @@ export class DealEvaluator {
     // Standard evaluation for pre-parsed mock/ebay items
     const totalCost = item.price + (item.shippingPrice || 0);
     const potentialMargin = item.marketPriceEstimate - totalCost;
-    const minProfitThreshold = item.currency === 'INR' ? 1000 : 15;
+    const minProfitThreshold = item.currency === 'INR' ? 500 : 15;
 
     if (potentialMargin <= minProfitThreshold || totalCost >= item.marketPriceEstimate) {
       return {
@@ -47,10 +47,12 @@ export class DealEvaluator {
   }
 
   private async parseAndEvaluateTelegramWithAI(item: DealItem): Promise<EvaluationResult> {
-    try {
-      const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      
-      const prompt = `You are an expert shopping deal aggregator and consumer copywriter.
+    // Try Gemini with a single retry on rate limit
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+        const prompt = `You are an expert shopping deal aggregator and consumer copywriter.
 Analyze this social media post sharing a shopping offer and extract the underlying deal details.
 
 Post Content:
@@ -67,66 +69,118 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
 }
 `;
 
-      const response = await model.generateContent(prompt);
-      const text = response.response.text().trim();
-      
-      const jsonStr = text.replace(/^```json/i, '').replace(/```$/, '').trim();
-      const result = JSON.parse(jsonStr);
+        const response = await model.generateContent(prompt);
+        const text = response.response.text().trim();
 
-      // Update the deal item details with parsed values
-      item.title = result.productTitle;
-      item.price = result.price;
-      item.marketPriceEstimate = result.marketPriceEstimate;
+        // Parse JSON response — handle various markdown wrappers
+        const jsonStr = text.replace(/^```(?:json|JSON)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+        const result = JSON.parse(jsonStr);
 
-      const totalCost = item.price + (item.shippingPrice || 0);
-      const estimatedProfit = item.marketPriceEstimate - totalCost;
+        // Update the deal item details with parsed values (create a copy to avoid partial mutation)
+        const parsedTitle = result.productTitle || item.title;
+        const parsedPrice = result.price || 0;
+        const parsedMarket = result.marketPriceEstimate || parsedPrice * 1.3;
 
-      return {
-        isDeal: result.isDeal && result.safetyScore >= 70 && estimatedProfit > 100,
-        reasoning: result.reasoning,
-        estimatedResaleValue: item.marketPriceEstimate,
-        estimatedProfit,
-        confidenceScore: 85,
-        safetyScore: result.safetyScore
-      };
+        item.title = parsedTitle;
+        item.price = parsedPrice;
+        item.marketPriceEstimate = parsedMarket;
 
-    } catch (error: any) {
-      console.error(`[Evaluator] Error parsing Telegram post with Gemini: ${error.message}`);
-      return this.parseTelegramWithHeuristics(item);
+        const totalCost = parsedPrice + (item.shippingPrice || 0);
+        const estimatedProfit = parsedMarket - totalCost;
+
+        return {
+          isDeal: result.isDeal && result.safetyScore >= 70 && estimatedProfit > 100,
+          reasoning: result.reasoning,
+          estimatedResaleValue: parsedMarket,
+          estimatedProfit,
+          confidenceScore: 85,
+          safetyScore: result.safetyScore
+        };
+
+      } catch (error: any) {
+        const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
+        console.error(`[Evaluator] Error parsing Telegram post with Gemini (attempt ${attempt + 1}): ${error.message}`);
+
+        if (isRateLimit && attempt === 0) {
+          // Wait 5 seconds and retry once on rate limit
+          console.log('[Evaluator] Rate limited. Waiting 5s before retry...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          continue;
+        }
+
+        // Fall back to heuristics
+        return this.parseTelegramWithHeuristics(item);
+      }
     }
+
+    return this.parseTelegramWithHeuristics(item);
   }
 
   private parseTelegramWithHeuristics(item: DealItem): EvaluationResult {
-    // Simple regex fallback to extract prices from text (e.g. "Rs. 36990" or "at 36,990")
     const text = item.description || '';
-    const prices = text.replace(/,/g, '').match(/\b\d{4,5}\b/g);
-    
-    let price = 0;
-    if (prices && prices.length > 0) {
-      price = Math.min(...prices.map(p => parseInt(p, 10)));
+
+    // Smarter price extraction — look for price patterns near keywords
+    const pricePatterns = [
+      /(?:Rs\.?|₹|INR|Price[:\s]*|at\s+)[\s]*([0-9,]+(?:\.\d{1,2})?)/gi,
+      /([0-9,]+(?:\.\d{1,2})?)\s*(?:only|rupees|rs)/gi,
+    ];
+
+    const prices: number[] = [];
+    for (const pattern of pricePatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const num = parseInt(match[1].replace(/,/g, ''), 10);
+        // Only accept reasonable prices (₹50 to ₹5,00,000)
+        if (num >= 50 && num <= 500000) {
+          prices.push(num);
+        }
+      }
     }
 
-    if (price > 0) {
-      item.title = item.description?.split('\n')[0].substring(0, 60) || 'Telegram Deal Product';
-      item.price = price;
-      item.marketPriceEstimate = price * 1.3; // assume retail is 30% higher
-      
-      const totalCost = item.price;
-      const estimatedProfit = item.marketPriceEstimate - totalCost;
+    // Fallback: find any 3-6 digit numbers that could be prices
+    if (prices.length === 0) {
+      const fallbackPrices = text.replace(/,/g, '').match(/\b\d{3,6}\b/g);
+      if (fallbackPrices) {
+        for (const p of fallbackPrices) {
+          const num = parseInt(p, 10);
+          // Skip numbers that look like years, model numbers, or other non-prices
+          if (num >= 100 && num <= 500000 && num !== 2024 && num !== 2025 && num !== 2026) {
+            prices.push(num);
+          }
+        }
+      }
+    }
+
+    if (prices.length > 0) {
+      const dealPrice = Math.min(...prices);
+      const mrp = prices.length > 1 ? Math.max(...prices) : dealPrice * 1.3;
+
+      // Extract title from the post text
+      const title = item.title || text.split('\n')[0].substring(0, 80) || 'Deal Product';
+      item.title = title;
+      item.price = dealPrice;
+      item.marketPriceEstimate = mrp;
+
+      const estimatedProfit = mrp - dealPrice;
+      const savingsPercent = mrp > 0 ? Math.round((estimatedProfit / mrp) * 100) : 0;
+
+      // Build a helpful description from the text
+      const firstLine = text.split('\n')[0].substring(0, 100);
+      const reasoning = `${firstLine} — Deal at ₹${dealPrice.toLocaleString('en-IN')} (Save ${savingsPercent}% off ₹${mrp.toLocaleString('en-IN')})`;
 
       return {
-        isDeal: true, // Always post deals from curated Telegram channels when we can parse a price
-        reasoning: 'Parsed price from text using basic heuristics. Looks profitable.',
-        estimatedResaleValue: item.marketPriceEstimate,
+        isDeal: true, // Always post deals from curated Telegram channels when price is found
+        reasoning,
+        estimatedResaleValue: mrp,
         estimatedProfit,
-        confidenceScore: 50,
-        safetyScore: 80
+        confidenceScore: 55,
+        safetyScore: 85
       };
     }
 
     return {
       isDeal: false,
-      reasoning: 'Could not extract valid deal pricing from Telegram post using heuristics.',
+      reasoning: 'Could not extract valid deal pricing from Telegram post.',
       estimatedResaleValue: 0,
       estimatedProfit: 0,
       confidenceScore: 90,
@@ -139,7 +193,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
       const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const currencySymbol = item.currency === 'INR' ? '₹' : '$';
       const currencyLabel = item.currency === 'INR' ? 'INR (Indian Rupees)' : 'USD (US Dollars)';
-      
+
       const prompt = `You are an expert e-commerce arbitrage and product flipping assistant.
 Analyze the following item listing and evaluate if it represents a highly profitable buy-and-resell opportunity (arbitrage).
 
@@ -171,11 +225,11 @@ You must output a JSON object matching this schema. Do NOT include markdown code
 
       const response = await model.generateContent(prompt);
       const text = response.response.text().trim();
-      const jsonStr = text.replace(/^```json/i, '').replace(/```$/, '').trim();
+      const jsonStr = text.replace(/^```(?:json|JSON)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
       const aiResult = JSON.parse(jsonStr);
 
       const estimatedProfit = aiResult.estimatedResaleValue - totalCost;
-      const minProfit = item.currency === 'INR' ? 1000 : 15;
+      const minProfit = item.currency === 'INR' ? 500 : 15;
 
       return {
         isDeal: aiResult.isDeal && aiResult.safetyScore >= 65 && estimatedProfit > minProfit,
@@ -210,8 +264,8 @@ You must output a JSON object matching this schema. Do NOT include markdown code
 
     const estimatedResaleValue = item.marketPriceEstimate;
     const estimatedProfit = estimatedResaleValue - totalCost;
-    
-    const minProfit = item.currency === 'INR' ? 1500 : 20;
+
+    const minProfit = item.currency === 'INR' ? 500 : 20;
     const isDeal = safetyScore >= 70 && estimatedProfit > minProfit;
 
     return {
