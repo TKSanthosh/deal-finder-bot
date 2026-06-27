@@ -13,7 +13,7 @@ async function main() {
   const notifier = new DealNotifier();
   
   const item: DealItem = {
-    id: 'force-amzn-real-carlton',
+    id: `force-amzn-test-twitter-${Date.now()}`,
     title: "Carlton London Men's Casual Slip-On Clogs",
     price: 660,
     shippingPrice: 0,

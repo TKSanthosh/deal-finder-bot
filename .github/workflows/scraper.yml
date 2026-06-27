@@ -3,7 +3,12 @@ name: Deal Scraper Bot
 on:
   schedule:
     - cron: '*/5 * * * *' # Runs automatically every 5 minutes (maximum cloud frequency)
-  workflow_dispatch: # Allows you to run the bot manually from your GitHub dashboard
+  workflow_dispatch:
+    inputs:
+      force_post:
+        description: 'Set to "true" to run a force-post test'
+        required: false
+        default: 'false'
 
 jobs:
   scrape:
@@ -27,7 +32,11 @@ jobs:
 
       - name: Run Scrape Cycle
         run: |
-          npx ts-node apps/bot/src/run-once.ts
+          if [ "${{ github.event.inputs.force_post }}" = "true" ]; then
+            npx ts-node apps/bot/src/force-post.ts
+          else
+            npx ts-node apps/bot/src/run-once.ts
+          fi
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
