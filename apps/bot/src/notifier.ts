@@ -14,14 +14,24 @@ export class DealNotifier {
   private affiliate = new AffiliateLinkGenerator();
   private pinterest = new PinterestClient();
 
-  private twitterClient = (process.env.TWITTER_APP_KEY && process.env.TWITTER_APP_SECRET && process.env.TWITTER_ACCESS_TOKEN && process.env.TWITTER_ACCESS_SECRET)
-    ? new TwitterApi({
+  private twitterClient = (() => {
+    // If OAuth 2.0 Access Token is directly provided (e.g. from the user screenshot)
+    if (process.env.TWITTER_ACCESS_TOKEN && !process.env.TWITTER_ACCESS_SECRET) {
+      console.log('[Notifier] Initializing Twitter client using OAuth 2.0 Access Token.');
+      return new TwitterApi(process.env.TWITTER_ACCESS_TOKEN);
+    }
+    // Fallback to OAuth 1.0a if all credentials are set
+    if (process.env.TWITTER_APP_KEY && process.env.TWITTER_APP_SECRET && process.env.TWITTER_ACCESS_TOKEN && process.env.TWITTER_ACCESS_SECRET) {
+      console.log('[Notifier] Initializing Twitter client using OAuth 1.0a User Context.');
+      return new TwitterApi({
         appKey: process.env.TWITTER_APP_KEY,
         appSecret: process.env.TWITTER_APP_SECRET,
         accessToken: process.env.TWITTER_ACCESS_TOKEN,
         accessSecret: process.env.TWITTER_ACCESS_SECRET,
-      })
-    : null;
+      });
+    }
+    return null;
+  })();
 
   async notify(item: DealItem, evaluation: EvaluationResult): Promise<void> {
     const totalCost = item.price + (item.shippingPrice || 0);
