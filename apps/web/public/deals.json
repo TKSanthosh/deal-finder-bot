@@ -9,7 +9,7 @@
     "url": "https://amzn.to/4ewnJo3",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517344937
+    "timestamp": 1782524139935
   },
   {
     "id": "tg-idoffers-135255",
@@ -21,7 +21,7 @@
     "url": "https://www.amazon.in/dp/B0009I9Z8Q/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517344107
+    "timestamp": 1782524138987
   },
   {
     "id": "tg-idoffers-135254",
@@ -33,19 +33,19 @@
     "url": "https://www.amazon.in/dp/B0C3LHV43S/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517343627
+    "timestamp": 1782524138485
   },
   {
     "id": "tg-idoffers-135248",
-    "title": "[Product Title: La Opala Opal Glass Crockery | for Family of",
+    "title": "[Product Title: Amazon.in] La Opala Opal Glass Crockery | fo",
     "price": 1311,
     "marketPriceEstimate": 1704.3,
     "savingsPercent": "23",
-    "imageUrl": "https://m.media-amazon.com/images/I/41JofXRV8RL._SY300_SX300_QL70_FMwebp_.jpg",
+    "imageUrl": "https://cdn4.telesco.pe/file/a7P3YywGy3MnXGMjIQhYjChD2w-qabKhOAh5DjzUX6KQM5ohuSG1ooSuJc05X-yWmS5mqU7WyTDb6A78RiXSpST2PwO6Wh87SY2X0kZ4t3iQCkPJpMdmGHE0LMVi6QXf58XjNnXYc02hIv9BO2HRj7ICzfbcxdRQ_J41E4OHfRqw-CSmazIDjgue9S0dcynGN_Nl9PlVaN7fAD3bT92lc0sg6k-w4nxVkI9_ze9oWBWCG1HpyFgR6bFXyU2TZVEJFNGn_dA15QoVdH5VwzgYCHsJ7zBvrzLa9OGcY8UvRFaOgDsoyyaVeAdUcnuKBSmRFMnIT9v1fClRXyLnQT33Wg.jpg",
     "url": "https://www.amazon.in/dp/B0GNR9J45L/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517342894
+    "timestamp": 1782524136957
   },
   {
     "id": "tg-idoffers-135241",
@@ -57,7 +57,7 @@
     "url": "https://dl.flipkart.com/dl/associate/open?affid=mockaffid&url=https%3A%2F%2Fdl.flipkart.com%2Fs%2FgRwH8PuuuN",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "flipkart",
-    "timestamp": 1782517341602
+    "timestamp": 1782524135423
   },
   {
     "id": "tg-idoffers-135238",
@@ -69,7 +69,7 @@
     "url": "https://www.amazon.in/dp/B0D32FSQB5/?tag=dealsradar00-21",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517340318
+    "timestamp": 1782524134520
   },
   {
     "id": "tg-idoffers-135237",
@@ -81,6 +81,6 @@
     "url": "https://amzn.to/3QZq9CC",
     "description": "Parsed price from text using basic heuristics. Looks profitable.",
     "source": "amazon_in",
-    "timestamp": 1782517338476
+    "timestamp": 1782524133263
   }
 ]
