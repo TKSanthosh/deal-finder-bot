@@ -67,7 +67,7 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
 }`;
 
         const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-          model: 'meta/llama3-70b-instruct',
+          model: 'meta/llama-3.1-70b-instruct',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
           max_tokens: 1024
@@ -229,7 +229,7 @@ You must output a JSON object matching this schema. Do NOT include markdown code
 }`;
 
       const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-        model: 'meta/llama3-70b-instruct',
+          model: 'meta/llama-3.1-70b-instruct',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 1024
