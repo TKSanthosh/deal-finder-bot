@@ -6,7 +6,7 @@ export class TelegramScraper implements Scraper {
   name = 'telegram';
 
   // List of popular public Telegram deals channels to scrape
-  private channels = ['idoffers', 'GoPaisa'];
+  private channels = ['idoffers', 'GoPaisa', 'LootDealsIndia', 'DesiDime'];
 
   async scrape(keywords: string[]): Promise<DealItem[]> {
     const allDeals: DealItem[] = [];

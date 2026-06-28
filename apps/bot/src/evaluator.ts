@@ -1,22 +1,23 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import axios from 'axios';
 import { DealItem, EvaluationResult } from './types';
 
 export class DealEvaluator {
-  private ai: GoogleGenerativeAI | null = null;
+  private hasAi: boolean = false;
+  private nvidiaKey: string | undefined;
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && apiKey !== 'your_gemini_api_key_here') {
-      this.ai = new GoogleGenerativeAI(apiKey);
+    this.nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (this.nvidiaKey && this.nvidiaKey.startsWith('nvapi-')) {
+      this.hasAi = true;
     } else {
-      console.warn('[Evaluator] GEMINI_API_KEY not set. Running in Heuristic Fallback Mode.');
+      console.warn('[Evaluator] NVIDIA_API_KEY not set. Running in Heuristic Fallback Mode.');
     }
   }
 
   async evaluate(item: DealItem): Promise<EvaluationResult> {
-    // If this is a raw Telegram post, we first need to parse it using Gemini
+    // If this is a raw Telegram post, we first need to parse it using AI
     if (item.price === 0 && item.description) {
-      if (this.ai) {
+      if (this.hasAi) {
         return this.parseAndEvaluateTelegramWithAI(item);
       } else {
         return this.parseTelegramWithHeuristics(item);
@@ -39,7 +40,7 @@ export class DealEvaluator {
       };
     }
 
-    if (this.ai) {
+    if (this.hasAi) {
       return this.evaluateWithAI(item, totalCost);
     } else {
       return this.evaluateWithHeuristics(item, totalCost);
@@ -47,11 +48,8 @@ export class DealEvaluator {
   }
 
   private async parseAndEvaluateTelegramWithAI(item: DealItem): Promise<EvaluationResult> {
-    // Try Gemini with a single retry on rate limit
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
         const prompt = `You are an expert shopping deal aggregator and consumer copywriter.
 Analyze this social media post sharing a shopping offer and extract the underlying deal details.
 
@@ -66,11 +64,21 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
   "isDeal": boolean (true if the deal price offers a significant discount of at least 20% compared to typical retail price),
   "reasoning": "string (A highly attractive, high-converting product description written for end customers. It must highlight 2-3 key features with emojis, specify who it is perfect for, and create urgency. Use simple unicode bullet points like '•' or emoji bullet points like '✨'. You can use standard HTML tags like <b>bold</b> and <i>italic</i> for formatting if needed, but do NOT use Markdown asterisk symbols. Keep it concise but extremely persuasive to drive immediate impulse buys)",
   "safetyScore": number // 0-100 (Deduct points if the post indicates the item is used, refurbished, damaged, box-only, or a suspicious clone. New items from Amazon/Flipkart should be 100)
-}
-`;
+}`;
 
-        const response = await model.generateContent(prompt);
-        const text = response.response.text().trim();
+        const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+          model: 'meta/llama3-70b-instruct',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 1024
+        }, {
+          headers: {
+            'Authorization': `Bearer ${this.nvidiaKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const text = response.data.choices[0].message.content.trim();
 
         // Parse JSON response — handle various markdown wrappers
         const jsonStr = text.replace(/^```(?:json|JSON)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
@@ -98,11 +106,10 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
         };
 
       } catch (error: any) {
-        const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
-        console.error(`[Evaluator] Error parsing Telegram post with Gemini (attempt ${attempt + 1}): ${error.message}`);
+        const isRateLimit = error.response?.status === 429;
+        console.error(`[Evaluator] Error parsing Telegram post with NVIDIA AI (attempt ${attempt + 1}): ${error.message}`);
 
         if (isRateLimit && attempt === 0) {
-          // Wait 5 seconds and retry once on rate limit
           console.log('[Evaluator] Rate limited. Waiting 5s before retry...');
           await new Promise(resolve => setTimeout(resolve, 5000));
           continue;
@@ -190,7 +197,6 @@ You must return a raw JSON object (no markdown formatting, no \`\`\`json) matchi
 
   private async evaluateWithAI(item: DealItem, totalCost: number): Promise<EvaluationResult> {
     try {
-      const model = this.ai!.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const currencySymbol = item.currency === 'INR' ? '₹' : '$';
       const currencyLabel = item.currency === 'INR' ? 'INR (Indian Rupees)' : 'USD (US Dollars)';
 
@@ -220,11 +226,21 @@ You must output a JSON object matching this schema. Do NOT include markdown code
   "estimatedResaleValue": number,
   "confidenceScore": number,
   "safetyScore": number
-}
-`;
+}`;
 
-      const response = await model.generateContent(prompt);
-      const text = response.response.text().trim();
+      const response = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+        model: 'meta/llama3-70b-instruct',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 1024
+      }, {
+        headers: {
+          'Authorization': `Bearer ${this.nvidiaKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const text = response.data.choices[0].message.content.trim();
       const jsonStr = text.replace(/^```(?:json|JSON)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
       const aiResult = JSON.parse(jsonStr);
 
@@ -240,7 +256,7 @@ You must output a JSON object matching this schema. Do NOT include markdown code
         safetyScore: aiResult.safetyScore
       };
     } catch (error: any) {
-      console.error(`[Evaluator] Gemini API error: ${error.message}. Falling back to heuristics.`);
+      console.error(`[Evaluator] NVIDIA API error: ${error.message}. Falling back to heuristics.`);
       return this.evaluateWithHeuristics(item, totalCost);
     }
   }
