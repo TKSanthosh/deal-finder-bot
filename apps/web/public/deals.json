@@ -1,5 +1,29 @@
 [
   {
+    "id": "tg-idoffers-141138-0g2hB73f",
+    "title": "Fresh Deal Alert: Dual Rewards Now LiveGet ₹250 Off + ₹250 Cashback = ₹500 Total Savings (Minimum ₹2500 Order Required)G",
+    "price": 250,
+    "marketPriceEstimate": 2500,
+    "savingsPercent": "90",
+    "imageUrl": "https://cdn5.telesco.pe/file/fA3KLnUN7c38ndSmu3Fsbsio4s8os1NnpbGNyo0LX-bmUeJfcg46ep26O8whNSIuSJUEQBC_YbSB1xVCrh6N-6a4Let8jm87WPAWn0R8isS517dcZcIcPzGoMA6nBgiQxNSVaRh2juGWvTXgKv3izo0afSoqrNtrwYBeLZOYCDQjFJsOKNt2XO6z89PnNNym7oYEvcqpdl9eyjrmzRqbyDU5YulTXh63pbxvaWSKyiXtKPNH7-Seckn-oYOPaBFlGdBoQsDociOTV4xsHl7gD8wkQtoaXztEPocvnVTZZRSctmMj_egHe1F7P3x1D-S-t5rbKCETJhLgtsiPvZsaBg.jpg",
+    "url": "https://www.amazon.in/l/205736272031?sid=9f7fds&bubble-id=deals-collection-OHL&ascsubtag=srctok-036ea169aebfd461&btn_type=ss&btn_ref=srctok-036ea169aebfd461&tag=dealfinderin-21",
+    "description": "Fresh Deal Alert: Dual Rewards Now LiveGet ₹250 Off + ₹250 Cashback = ₹500 Total Savings (Minimum ₹2 — Deal at ₹250 (Save 90% off ₹2,500)",
+    "source": "amazon_in",
+    "timestamp": 1793560133689
+  },
+  {
+    "id": "tg-idoffers-141120-01DQY7S3",
+    "title": "MyFitness Peanut Butter & Oats - Up to 50% off + coupon codeChocolate Peanut Butter Crunchy 510g ₹233 : Peanut Butter Cr",
+    "price": 233,
+    "marketPriceEstimate": 468,
+    "savingsPercent": "50",
+    "imageUrl": "",
+    "url": "https://www.amazon.in/dp/B08TWSR47Y?ascsubtag=srctok-2552a5940b913cf5&btn_type=ss&btn_ref=srctok-2552a5940b913cf5&tag=dealfinderin-21",
+    "description": "MyFitness Peanut Butter & Oats - Up to 50% off + coupon codeChocolate Peanut Butter Crunchy 510g ₹23 — Deal at ₹233 (Save 50% off ₹468)",
+    "source": "amazon_in",
+    "timestamp": 1793560132185
+  },
+  {
     "id": "tg-idoffers-141129-0axpiZeH",
     "title": "Shatras Lemon Power and Fresh Floor Cleaner 1 L – Multi-Surface Cle.. Deal Price:99 Rs. Discount:67% Off",
     "price": 99,
@@ -574,29 +598,5 @@
     "description": "Perfume 200ml at just ₹199!https://dl.flipkart.com/s/_Ctq58NNNNGrab yours now! — Deal at ₹199 (Save 23% off ₹258.7)",
     "source": "flipkart",
     "timestamp": 1793387880413
-  },
-  {
-    "id": "tg-idoffers-141029-2XIWNNNN",
-    "title": "FLIPKART DIWALI FLASH SALE – SMARTPHONE PRICES SLASHED! ⏰ 6 PM TO 10 PM ONLYREALME P4X (6/128GB) – ₹22,999* NOTE 15 SE (",
-    "price": 12999,
-    "marketPriceEstimate": 22999,
-    "savingsPercent": "43",
-    "imageUrl": "",
-    "url": "https://dl.flipkart.com/s/_2_XIWNNNN",
-    "description": "🔥 FLIPKART DIWALI FLASH SALE – SMARTPHONE PRICES SLASHED! 🔥⏰ 6 PM TO 10 PM ONLYREALME P4X (6/128GB — Deal at ₹12,999 (Save 43% off ₹22,999)",
-    "source": "flipkart",
-    "timestamp": 1793368999901
-  },
-  {
-    "id": "tg-idoffers-141022-73HRNNNN",
-    "title": "Loot For Needy | HP Victus RTX 3050 Gaming Laptops Starts ₹12500 Off Using Bank Offers",
-    "price": 12500,
-    "marketPriceEstimate": 16250,
-    "savingsPercent": "23",
-    "imageUrl": "",
-    "url": "https://dl.flipkart.com/s/Q573HRNNNN",
-    "description": "Loot For Needy | HP Victus RTX 3050 Gaming Laptops Starts @79490*https://dl.flipkart.com/s/Q573HRNNN — Deal at ₹12,500 (Save 23% off ₹16,250)",
-    "source": "flipkart",
-    "timestamp": 1793368998398
   }
 ]
